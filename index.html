@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>zmd bot fixer</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #111827;
+      --panel2: #0f172a;
+      --line: #334155;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --green: #65f26b;
+      --gray: #7a7a7a;
+      --empty: #1f2937;
+      --accent: #38bdf8;
+      --accent2: #22c55e;
+      --danger: #ef4444;
+      --cell: 50px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 0%, #0f1a2f 0%, var(--bg) 45%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Microsoft YaHei, sans-serif;
+    }
+    .app { max-width: 1400px; margin: 0 auto; padding: 16px; }
+    .layout {
+      display: grid;
+      grid-template-columns: 700px 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.0));
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      margin-bottom: 14px;
+    }
+    h1 { font-size: 20px; margin: 0 0 10px; }
+    h2 { font-size: 16px; margin: 0 0 10px; }
+    .muted { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .btn, button {
+      background: #1f2937;
+      color: var(--text);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn:hover, button:hover { filter: brightness(1.08); }
+    .btn.primary { background: #0284c7; border-color: #0ea5e9; }
+    .btn.success { background: #166534; border-color: #22c55e; }
+    .btn.danger { background: #7f1d1d; border-color: #ef4444; }
+    .btn.active { outline: 2px solid rgba(56,189,248,0.35); }
+    input[type="number"], input[type="text"], textarea {
+      background: #0f172a;
+      color: var(--text);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    input[type="number"] { width: 70px; }
+    .small-num { width: 50px !important; text-align: center; padding: 4px 2px; }
+    .board-wrap { overflow: auto; }
+    .board-grid, .result-grid {
+      display: grid;
+      gap: 4px;
+      width: max-content;
+      align-items: center;
+    }
+    .cell {
+      width: var(--cell); height: var(--cell);
+      border-radius: 6px;
+      border: 1px solid #334155;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 12px;
+      user-select: none;
+    }
+    .cell-btn {
+      width: var(--cell); height: var(--cell);
+      border-radius: 6px; border: 1px solid #334155;
+      cursor: pointer;
+      color: #111827; font-weight: 700;
+      padding: 0;
+    }
+    .cell-btn:hover { outline: 2px solid rgba(56,189,248,0.35); }
+    .clue-label {
+      width: var(--cell); height: var(--cell);
+      display: flex; align-items: center; justify-content: center;
+      color: #bef264; font-weight: 700; font-size: 14px;
+    }
+    .piece-list { max-height: 48vh; overflow: auto; padding-right: 4px; }
+    .piece-card {
+      background: rgba(15,23,42,0.8);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .piece-grid { display: grid; gap: 4px; width: max-content; }
+    .piece-cell {
+      width: 24px; height: 24px; border-radius: 4px;
+      border: 1px solid #475569; cursor: pointer;
+      padding: 0;
+    }
+    .status { font-size: 13px; color: #cbd5e1; }
+    .placement-item {
+      background: rgba(15,23,42,0.85);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; vertical-align: middle; margin-right: 8px; }
+    .footer-tip { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 8px; }
+    .section-gap { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="layout">
+      <div>
+        <div class="panel">
+          <h1>zmd维修机器人(放置拼图小游戏)求解器</h1>
+          <div class="muted">
+            使用步骤：自定义棋盘大小、定义初始棋盘状态(包含灰绿两种格子)、行列目标数字、固定绿色/灰色格、拼图编辑<br>
+            规则：拼图可以旋转，但是不能镜面翻转，需要放置拼图后格子盘中的绿色格子满足侧方和上方对应的要求。
+          </div>
+          <div class="row section-gap">
+            <label>棋盘大小 N：</label>
+            <input id="boardSize" type="number" min="1" max="12" value="5" />
+            <button class="btn" id="resizeBoardBtn">应用大小</button>
+            <button class="btn" id="exampleBtn">载入示例</button>
+            <button class="btn" id="exportBtn">导出配置</button>
+            <button class="btn" id="importBtn">导入配置</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>棋盘编辑</h2>
+          <div class="row" id="editModeRow">
+            <button class="btn active" data-mode="empty">设为空格</button>
+            <button class="btn" data-mode="fixedGreen">固定绿色</button>
+            <button class="btn" data-mode="fixedGray">固定灰色</button>
+          </div>
+          <div class="row section-gap">
+            <button class="btn" id="batchRowBtn">批量设置左侧数字</button>
+            <button class="btn" id="batchColBtn">批量设置上方数字</button>
+            <button class="btn" id="clearFixedBtn">清空固定格</button>
+          </div>
+          <div class="board-wrap section-gap">
+            <div id="boardEditor"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="row" style="justify-content: space-between;">
+            <h2 style="margin:0;">拼图输入</h2>
+            <button class="btn success" id="addPieceBtn">+ 添加拼图</button>
+          </div>
+          <div id="pieceList" class="piece-list section-gap"></div>
+        </div>
+
+        <div class="panel">
+          <div class="row">
+            <button class="btn primary" id="solveBtn">开始求解</button>
+            <button class="btn" id="clearSolutionBtn">清除解</button>
+            <span id="statusText" class="status"></span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h2>结果展示</h2>
+          <div id="resultBoard" class="board-wrap"></div>
+          <div id="placementList" class="section-gap"></div>
+          <div class="footer-tip">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CELL = 50;
+    const COLORS = ['#22c55e','#3b82f6','#f59e0b','#ef4444','#a855f7','#06b6d4','#84cc16','#f97316','#ec4899','#14b8a6'];
+
+    const state = {
+      n: 5,
+      board: emptyGrid(5,5,0), // 0 空, 1 固定绿, -1 固定灰
+      rowClues: [0,0,0,0,0],
+      colClues: [0,0,0,0,0],
+      editMode: 'empty',
+      pieces: [
+        { id: 1, name: 'L-1', h: 2, w: 2, grid: [[1,1],[1,0]] }
+      ],
+      nextPieceId: 3,
+      solution: null,
+    };
+
+    function emptyGrid(h,w,v=0){ return Array.from({length:h},()=>Array(w).fill(v)); }
+    function cloneGrid(g){ return g.map(r=>[...r]); }
+    function pieceColor(i){ return COLORS[i % COLORS.length]; }
+    function boardCellColor(v){ return v===1 ? '#65f26b' : v===-1 ? '#7a7a7a' : '#1f2937'; }
+    function sum(arr){ return arr.reduce((a,b)=>a+b,0); }
+    function setStatus(msg){ document.getElementById('statusText').textContent = msg || ''; }
+
+    function fixedGreenRowCounts(){ return state.board.map(row => row.filter(v=>v===1).length); }
+    function fixedGreenColCounts(){
+      return Array.from({length: state.n}, (_, c) => state.board.reduce((s,row)=>s+(row[c]===1?1:0),0));
+    }
+
+    function normalizeCells(cells){
+      let minR = Infinity, minC = Infinity;
+      for (const [r,c] of cells){ if(r<minR) minR=r; if(c<minC) minC=c; }
+      const shifted = cells.map(([r,c])=>[r-minR, c-minC]);
+      let h=0,w=0;
+      for (const [r,c] of shifted){ if(r+1>h) h=r+1; if(c+1>w) w=c+1; }
+      return { cells: shifted, h, w };
+    }
+    function rotate90(cells){
+      const n = normalizeCells(cells);
+      const rot = n.cells.map(([r,c]) => [c, n.h - 1 - r]);
+      return normalizeCells(rot);
+    }
+    function uniqShapes(shapes){
+      const seen = new Set();
+      const out = [];
+      for(const s of shapes){
+        const key = s.cells.slice().sort((a,b)=>(a[0]-b[0])||(a[1]-b[1])).map(([r,c])=>`${r},${c}`).join(';');
+        if(!seen.has(key)){ seen.add(key); out.push(s); }
+      }
+      return out;
+    }
+    function getPieceOrientations(piece){
+      const cells = [];
+      for(let r=0;r<piece.h;r++) for(let c=0;c<piece.w;c++) if(piece.grid[r][c]) cells.push([r,c]);
+      if(cells.length===0) return [];
+      let cur = normalizeCells(cells);
+      const list = [];
+      for(let k=0;k<4;k++){ list.push(cur); cur = rotate90(cur.cells); }
+      return uniqShapes(list);
+    }
+    function pieceArea(piece){
+      let s=0; for(let r=0;r<piece.h;r++) for(let c=0;c<piece.w;c++) s += piece.grid[r][c] ? 1 : 0; return s;
+    }
+
+    function renderAll(){
+      renderEditModeButtons();
+      renderBoardEditor();
+      renderPieceList();
+      renderResult();
+      document.getElementById('boardSize').value = state.n;
+    }
+
+    function renderEditModeButtons(){
+      const row = document.getElementById('editModeRow');
+      [...row.querySelectorAll('button')].forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === state.editMode);
+      });
+    }
+
+    function renderBoardEditor(){
+      const n = state.n;
+      const wrap = document.getElementById('boardEditor');
+      wrap.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'board-grid';
+      grid.style.gridTemplateColumns = `40px repeat(${n}, ${CELL}px)`;
+
+      const corner = document.createElement('div');
+      corner.style.width = '40px'; corner.style.height = `${CELL}px`;
+      grid.appendChild(corner);
+      for(let c=0;c<n;c++){
+        const inp = document.createElement('input');
+        inp.type = 'number'; inp.min = '0'; inp.max = String(n);
+        inp.value = state.colClues[c] ?? 0;
+        inp.className = 'small-num';
+        inp.title = `第 ${c+1} 列目标`;
+        inp.addEventListener('change', () => {
+          state.colClues[c] = clampInt(inp.value, 0, n);
+          state.solution = null;
+          renderResult();
+        });
+        grid.appendChild(inp);
+      }
+
+      for(let r=0;r<n;r++){
+        const rinp = document.createElement('input');
+        rinp.type = 'number'; rinp.min='0'; rinp.max=String(n);
+        rinp.value = state.rowClues[r] ?? 0;
+        rinp.className = 'small-num';
+        rinp.style.width = '40px';
+        rinp.title = `第 ${r+1} 行目标`;
+        rinp.addEventListener('change', () => {
+          state.rowClues[r] = clampInt(rinp.value, 0, n);
+          state.solution = null;
+          renderResult();
+        });
+        grid.appendChild(rinp);
+
+        for(let c=0;c<n;c++){
+          const btn = document.createElement('button');
+          btn.className = 'cell-btn';
+          btn.style.background = boardCellColor(state.board[r][c]);
+          btn.textContent = state.board[r][c] === 1 ? '✓' : state.board[r][c] === -1 ? '✕' : '';
+          btn.title = `(${r+1},${c+1})`;
+          btn.addEventListener('click', () => {
+            state.board[r][c] = state.editMode === 'fixedGreen' ? 1 : state.editMode === 'fixedGray' ? -1 : 0;
+            state.solution = null;
+            renderBoardEditor();
+            renderResult();
+          });
+          grid.appendChild(btn);
+        }
+      }
+      wrap.appendChild(grid);
+    }
+
+    function renderPieceList(){
+      const list = document.getElementById('pieceList');
+      list.innerHTML = '';
+      if(state.pieces.length === 0){
+        const d = document.createElement('div'); d.className = 'muted'; d.textContent = '暂无拼图，请点击“添加拼图”。';
+        list.appendChild(d); return;
+      }
+      state.pieces.forEach((p, idx) => {
+        const card = document.createElement('div'); card.className = 'piece-card';
+
+        const head = document.createElement('div'); head.className = 'row'; head.style.marginBottom = '8px';
+        const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = pieceColor(idx); head.appendChild(dot);
+
+        const nameInp = document.createElement('input'); nameInp.type='text'; nameInp.value = p.name; nameInp.style.width = '120px';
+        nameInp.addEventListener('change', () => { p.name = nameInp.value || `Piece-${p.id}`; state.solution = null; renderResult(); });
+        head.appendChild(nameInp);
+
+        head.appendChild(makeLabel('高'));
+        const hInp = document.createElement('input'); hInp.type='number'; hInp.min='1'; hInp.max='6'; hInp.value = p.h; hInp.style.width='56px';
+        hInp.addEventListener('change', () => resizePiece(p.id, hInp.value, p.w));
+        head.appendChild(hInp);
+
+        head.appendChild(makeLabel('宽'));
+        const wInp = document.createElement('input'); wInp.type='number'; wInp.min='1'; wInp.max='6'; wInp.value = p.w; wInp.style.width='56px';
+        wInp.addEventListener('change', () => resizePiece(p.id, p.h, wInp.value));
+        head.appendChild(wInp);
+
+        const areaSpan = document.createElement('span'); areaSpan.className='muted'; areaSpan.textContent = `该拼图格子数：${pieceArea(p)}`;
+        head.appendChild(areaSpan);
+
+        const delBtn = document.createElement('button'); delBtn.className = 'btn danger'; delBtn.style.marginLeft = 'auto'; delBtn.textContent = '删除';
+        delBtn.addEventListener('click', () => { state.pieces = state.pieces.filter(x=>x.id!==p.id); state.solution=null; renderAll(); });
+        head.appendChild(delBtn);
+
+        card.appendChild(head);
+
+        const grid = document.createElement('div');
+        grid.className = 'piece-grid';
+        grid.style.gridTemplateColumns = `repeat(${p.w}, 24px)`;
+        for(let r=0;r<p.h;r++) for(let c=0;c<p.w;c++){
+          const b = document.createElement('button');
+          b.className = 'piece-cell';
+          b.style.background = p.grid[r][c] ? pieceColor(idx) : '#0f172a';
+          b.title = '点击切换该单元是否属于拼图';
+          b.addEventListener('click', () => {
+            p.grid[r][c] = p.grid[r][c] ? 0 : 1;
+            state.solution = null;
+            renderPieceList();
+            renderResult();
+          });
+          grid.appendChild(b);
+        }
+        card.appendChild(grid);
+
+        const info = document.createElement('div'); info.className='muted'; info.style.marginTop='8px';
+        info.textContent = `旋转去重后方向数：${getPieceOrientations(p).length}`;
+        card.appendChild(info);
+
+        list.appendChild(card);
+      });
+    }
+
+    function makeLabel(t){ const s=document.createElement('span'); s.className='muted'; s.textContent=t; return s; }
+
+    function renderResult(){
+      const wrap = document.getElementById('resultBoard');
+      const placementList = document.getElementById('placementList');
+      wrap.innerHTML = '';
+      placementList.innerHTML = '';
+      const n = state.n;
+
+      let overlay = null;
+      if(state.solution){
+        overlay = Array.from({length:n}, ()=>Array(n).fill(null));
+        for(const pl of state.solution.placements){
+          for(const [dr,dc] of pl.shape.cells){ overlay[pl.r+dr][pl.c+dc] = pl.pieceIndex; }
+        }
+      }
+
+      const grid = document.createElement('div');
+      grid.className = 'result-grid';
+      grid.style.gridTemplateColumns = `40px repeat(${n}, ${CELL}px)`;
+      const corner = document.createElement('div'); corner.style.width='40px'; corner.style.height=`${CELL}px`; grid.appendChild(corner);
+      for(let c=0;c<n;c++){
+        const d = document.createElement('div'); d.className='clue-label'; d.textContent = state.colClues[c] ?? 0; grid.appendChild(d);
+      }
+      for(let r=0;r<n;r++){
+        const rr = document.createElement('div'); rr.className='clue-label'; rr.style.width='40px'; rr.textContent = state.rowClues[r] ?? 0; grid.appendChild(rr);
+        for(let c=0;c<n;c++){
+          const d = document.createElement('div'); d.className='cell';
+          let bg = boardCellColor(state.board[r][c]);
+          if(overlay && overlay[r][c] != null) bg = pieceColor(overlay[r][c]);
+          d.style.background = bg;
+          d.textContent = state.board[r][c] === 1 ? '✓' : state.board[r][c] === -1 ? '✕' : '';
+          grid.appendChild(d);
+        }
+      }
+      wrap.appendChild(grid);
+
+      if(state.solution){
+        const title = document.createElement('div'); title.style.fontWeight='600'; title.style.marginBottom='8px'; title.textContent = '放置详情（左上角坐标从 1 开始）';
+        placementList.appendChild(title);
+        state.solution.placements.forEach((pl, i) => {
+          const item = document.createElement('div'); item.className = 'placement-item';
+          const dot = document.createElement('span'); dot.className='dot'; dot.style.background = pieceColor(pl.pieceIndex);
+          const name = state.pieces[pl.pieceIndex]?.name || `Piece-${pl.pieceIndex+1}`;
+          item.appendChild(dot);
+          item.appendChild(document.createTextNode(`${name} → 位置 (${pl.r+1}, ${pl.c+1}), 方向 ${pl.orientationIndex+1}/${pl.totalOrientations}`));
+          placementList.appendChild(item);
+        });
+      }
+    }
+
+    function clampInt(v, lo, hi){
+      const x = Number(v);
+      if(!Number.isFinite(x)) return lo;
+      return Math.max(lo, Math.min(hi, Math.floor(x)));
+    }
+
+    function resizeBoardTo(nn){
+      const n = clampInt(nn, 1, 12);
+      const oldN = state.n;
+      const oldBoard = state.board;
+      const g = emptyGrid(n,n,0);
+      for(let r=0;r<Math.min(n,oldN);r++) for(let c=0;c<Math.min(n,oldN);c++) g[r][c] = oldBoard[r][c];
+      state.n = n;
+      state.board = g;
+      state.rowClues = Array.from({length:n}, (_,i)=> Number.isInteger(state.rowClues[i]) ? state.rowClues[i] : 0);
+      state.colClues = Array.from({length:n}, (_,i)=> Number.isInteger(state.colClues[i]) ? state.colClues[i] : 0);
+      state.solution = null;
+      renderAll();
+      setStatus('已更新棋盘大小。');
+    }
+
+    function resizePiece(id, newH, newW){
+      const p = state.pieces.find(x=>x.id===id); if(!p) return;
+      const h = clampInt(newH,1,6), w = clampInt(newW,1,6);
+      const g = emptyGrid(h,w,0);
+      for(let r=0;r<Math.min(h,p.h);r++) for(let c=0;c<Math.min(w,p.w);c++) g[r][c] = p.grid[r][c];
+      p.h = h; p.w = w; p.grid = g;
+      state.solution = null;
+      renderPieceList(); renderResult();
+    }
+
+    function validateBeforeSolve(){
+      const n = state.n;
+      if(state.rowClues.length !== n || state.colClues.length !== n) return '行列线索长度与棋盘大小不一致';
+      for(let i=0;i<n;i++){
+        if(state.rowClues[i] > n || state.colClues[i] > n || state.rowClues[i] < 0 || state.colClues[i] < 0) return '行/列线索必须在 0 到 N 之间';
+      }
+      const rowFixed = fixedGreenRowCounts();
+      const colFixed = fixedGreenColCounts();
+      for(let r=0;r<n;r++) if(rowFixed[r] > state.rowClues[r]) return `第 ${r+1} 行固定绿色数量超过目标`;
+      for(let c=0;c<n;c++) if(colFixed[c] > state.colClues[c]) return `第 ${c+1} 列固定绿色数量超过目标`;
+      for(const p of state.pieces) if(pieceArea(p) === 0) return `拼图 ${p.name} 为空`;
+      return null;
+    }
+
+    function solvePuzzle({ n, board, rowClues, colClues, pieces }) {
+      const rowNeed = rowClues.map((x, r) => x - board[r].filter(v => v === 1).length);
+      const colNeed = colClues.map((x, c) => x - board.reduce((s, row) => s + (row[c] === 1 ? 1 : 0), 0));
+      if (rowNeed.some(x => x < 0) || colNeed.some(x => x < 0)) return null;
+
+      const pieceAreas = pieces.map(pieceArea);
+      const totalNeed = sum(rowNeed);
+      const totalArea = sum(pieceAreas);
+      if(totalArea !== totalNeed) return null; // 必须用完所有拼图
+
+      const occupied = Array.from({ length: n }, () => Array(n).fill(false));
+
+      const pieceData = pieces.map((p, pieceIndex) => {
+        const orientations = getPieceOrientations(p);
+        if(orientations.length === 0) throw new Error(`拼图 ${p.name} 为空`);
+        const placements = [];
+        orientations.forEach((shape, orientationIndex) => {
+          for(let r=0; r<=n-shape.h; r++){
+            for(let c=0; c<=n-shape.w; c++){
+              let ok = true;
+              const rowInc = Array(n).fill(0);
+              const colInc = Array(n).fill(0);
+              for(const [dr,dc] of shape.cells){
+                const rr = r + dr, cc = c + dc;
+                if(board[rr][cc] !== 0){ ok = false; break; }
+                rowInc[rr]++; colInc[cc]++;
+              }
+              if(!ok) continue;
+              for(let i=0;i<n;i++){ if(rowInc[i] > rowNeed[i] || colInc[i] > colNeed[i]) { ok = false; break; } }
+              if(!ok) continue;
+              placements.push({ r,c,shape,orientationIndex,totalOrientations:orientations.length,rowInc,colInc });
+            }
+          }
+        });
+        return { pieceIndex, placements, area: pieceAreas[pieceIndex] };
+      });
+
+      if(pieceData.some(pd => pd.placements.length === 0)) return null;
+
+      const order = pieceData.slice().sort((a,b)=>(a.placements.length - b.placements.length) || (b.area - a.area));
+      const rowRem = rowNeed.slice();
+      const colRem = colNeed.slice();
+      const chosen = [];
+
+      const remainingAreasSuffix = Array(order.length + 1).fill(0);
+      for(let i=order.length-1;i>=0;i--) remainingAreasSuffix[i] = remainingAreasSuffix[i+1] + order[i].area;
+
+      function canPlace(pl){
+        for(const [dr,dc] of pl.shape.cells){ if(occupied[pl.r+dr][pl.c+dc]) return false; }
+        for(let i=0;i<n;i++){ if(pl.rowInc[i] > rowRem[i] || pl.colInc[i] > colRem[i]) return false; }
+        return true;
+      }
+      function place(pl){
+        for(const [dr,dc] of pl.shape.cells) occupied[pl.r+dr][pl.c+dc] = true;
+        for(let i=0;i<n;i++){ rowRem[i] -= pl.rowInc[i]; colRem[i] -= pl.colInc[i]; }
+      }
+      function unplace(pl){
+        for(const [dr,dc] of pl.shape.cells) occupied[pl.r+dr][pl.c+dc] = false;
+        for(let i=0;i<n;i++){ rowRem[i] += pl.rowInc[i]; colRem[i] += pl.colInc[i]; }
+      }
+      function feasibility(depth){
+        const need = sum(rowRem);
+        if(need !== remainingAreasSuffix[depth]) return false;
+        const rowCap = Array(n).fill(0), colCap = Array(n).fill(0);
+        for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(board[r][c]===0 && !occupied[r][c]){ rowCap[r]++; colCap[c]++; }
+        for(let i=0;i<n;i++){
+          if(rowRem[i] < 0 || colRem[i] < 0) return false;
+          if(rowRem[i] > rowCap[i] || colRem[i] > colCap[i]) return false;
+        }
+        return true;
+      }
+      function dfs(depth){
+        if(depth === order.length) return rowRem.every(v=>v===0) && colRem.every(v=>v===0);
+        if(!feasibility(depth)) return false;
+        const pd = order[depth];
+        const scored = pd.placements.map(pl => {
+          let score = 0;
+          for(const [dr,dc] of pl.shape.cells){ score += rowRem[pl.r+dr] + colRem[pl.c+dc]; }
+          return { pl, score };
+        }).sort((a,b)=>a.score-b.score);
+        for(const {pl} of scored){
+          if(!canPlace(pl)) continue;
+          place(pl);
+          chosen.push({ ...pl, pieceIndex: pd.pieceIndex });
+          if(dfs(depth+1)) return true;
+          chosen.pop();
+          unplace(pl);
+        }
+        return false;
+      }
+
+      const ok = dfs(0);
+      if(!ok) return null;
+      chosen.sort((a,b)=>a.pieceIndex-b.pieceIndex);
+      return { placements: chosen };
+    }
+
+    function exportConfig(){
+      const cfg = {
+        n: state.n,
+        board: state.board,
+        rowClues: state.rowClues,
+        colClues: state.colClues,
+        pieces: state.pieces,
+      };
+      const text = JSON.stringify(cfg, null, 2);
+      if(navigator.clipboard && window.isSecureContext){
+        navigator.clipboard.writeText(text).then(()=> setStatus('配置已复制到剪贴板（JSON）。'));
+      } else {
+        prompt('请复制以下 JSON 配置：', text);
+      }
+    }
+
+    function importConfig(){
+      const text = prompt('请粘贴 JSON 配置：');
+      if(!text) return;
+      try{
+        const cfg = JSON.parse(text);
+        if(!Number.isInteger(cfg.n) || cfg.n < 1 || cfg.n > 12) throw new Error('n 非法');
+        if(!Array.isArray(cfg.rowClues) || cfg.rowClues.length !== cfg.n) throw new Error('rowClues 非法');
+        if(!Array.isArray(cfg.colClues) || cfg.colClues.length !== cfg.n) throw new Error('colClues 非法');
+        if(!Array.isArray(cfg.board) || cfg.board.length !== cfg.n || cfg.board.some(r=>!Array.isArray(r)||r.length!==cfg.n)) throw new Error('board 非法');
+        if(!Array.isArray(cfg.pieces)) throw new Error('pieces 非法');
+        state.n = cfg.n;
+        state.rowClues = cfg.rowClues.map(x=>clampInt(x,0,cfg.n));
+        state.colClues = cfg.colClues.map(x=>clampInt(x,0,cfg.n));
+        state.board = cfg.board.map(r=>r.map(v=>v===1?1:v===-1?-1:0));
+        state.pieces = cfg.pieces.map((p,i)=>({
+          id: Number.isInteger(p.id) ? p.id : (i+1),
+          name: typeof p.name === 'string' ? p.name : `Piece-${i+1}`,
+          h: clampInt(p.h,1,6),
+          w: clampInt(p.w,1,6),
+          grid: Array.isArray(p.grid) ? p.grid.map(row => Array.isArray(row) ? row.map(v=>v?1:0) : []) : [[]],
+        }));
+        // 修正 grid 与 h,w 尺寸
+        state.pieces.forEach(p => {
+          const g = emptyGrid(p.h,p.w,0);
+          for(let r=0;r<Math.min(p.h,p.grid.length);r++){
+            for(let c=0;c<Math.min(p.w,(p.grid[r]||[]).length);c++) g[r][c] = p.grid[r][c] ? 1 : 0;
+          }
+          p.grid = g;
+        });
+        state.nextPieceId = Math.max(1, ...state.pieces.map((p,i)=>p.id || i+1)) + 1;
+        state.solution = null;
+        renderAll();
+        setStatus('导入成功。');
+      }catch(e){ setStatus('导入失败：' + e.message); }
+    }
+
+    function batchSetClues(kind){
+      const n = state.n;
+      const text = prompt(`请输入${kind==='row'?'行':'列'}数字（空格/逗号分隔，共 ${n} 个）`);
+      if(!text) return;
+      const arr = text.split(/[\s,]+/).filter(Boolean).map(Number);
+      if(arr.length !== n || arr.some(x => !Number.isInteger(x) || x < 0 || x > n)){
+        setStatus('输入格式不合法。'); return;
+      }
+      if(kind==='row') state.rowClues = arr; else state.colClues = arr;
+      state.solution = null;
+      renderBoardEditor(); renderResult();
+      setStatus('已批量设置。');
+    }
+
+    function applyExample(){
+      const n = 5;
+      const g = emptyGrid(n,n,0);
+      g[0][3] = 1;
+      g[2][0] = 1;
+      g[3][2] = -1;
+      state.n = n;
+      state.board = g;
+      state.rowClues = [2,2,3,1,2];
+      state.colClues = [2,2,2,2,2];
+      state.pieces = [
+        { id: 1, name: 'L', h: 2, w: 2, grid: [[1,1],[1,0]] },
+        { id: 2, name: 'I3', h: 1, w: 3, grid: [[1,1,1]] },
+        { id: 3, name: 'Z4', h: 2, w: 3, grid: [[1,1,0],[0,1,1]] },
+      ];
+      state.nextPieceId = 4;
+      state.solution = null;
+      renderAll();
+      setStatus('已载入示例。');
+    }
+
+    function solveCurrent(){
+      const err = validateBeforeSolve();
+      if(err){ setStatus('无法求解：' + err); return; }
+      setStatus('求解中...');
+      state.solution = null;
+      renderResult();
+      setTimeout(() => {
+        try{
+          const res = solvePuzzle({ n: state.n, board: state.board, rowClues: state.rowClues, colClues: state.colClues, pieces: state.pieces });
+          if(!res){ setStatus('未找到解（可能无解，或输入有误）。'); }
+          else { state.solution = res; setStatus(`找到解！共放置 ${res.placements.length} 块拼图。`); }
+          renderResult();
+        }catch(e){ setStatus('求解失败：' + e.message); }
+      }, 10);
+    }
+
+    function addPiece(){
+      const id = state.nextPieceId++;
+      state.pieces.push({ id, name: `Piece-${id}`, h: 3, w: 3, grid: [[0,0,0],[0,0,0],[0,0,0]] });
+      state.solution = null;
+      renderPieceList(); renderResult();
+    }
+
+    function clearFixed(){
+      state.board = emptyGrid(state.n, state.n, 0);
+      state.solution = null;
+      renderBoardEditor(); renderResult();
+      setStatus('已清空固定格。');
+    }
+
+    // 事件绑定
+    document.getElementById('resizeBoardBtn').addEventListener('click', () => resizeBoardTo(document.getElementById('boardSize').value));
+    document.getElementById('exampleBtn').addEventListener('click', applyExample);
+    document.getElementById('exportBtn').addEventListener('click', exportConfig);
+    document.getElementById('importBtn').addEventListener('click', importConfig);
+    document.getElementById('batchRowBtn').addEventListener('click', () => batchSetClues('row'));
+    document.getElementById('batchColBtn').addEventListener('click', () => batchSetClues('col'));
+    document.getElementById('clearFixedBtn').addEventListener('click', clearFixed);
+    document.getElementById('addPieceBtn').addEventListener('click', addPiece);
+    document.getElementById('solveBtn').addEventListener('click', solveCurrent);
+    document.getElementById('clearSolutionBtn').addEventListener('click', () => { state.solution = null; renderResult(); setStatus('已清除解。'); });
+
+    document.getElementById('editModeRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-mode]');
+      if(!btn) return;
+      state.editMode = btn.dataset.mode;
+      renderEditModeButtons();
+    });
+
+    // 初始化
+    renderAll();
+    setStatus('准备就绪。');
+  </script>
+</body>
+</html>
